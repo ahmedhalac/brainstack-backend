@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { RegisterDto, RegisterResponse } from './dto/register.dto';
@@ -13,6 +14,8 @@ import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -50,7 +53,7 @@ export class AuthService {
         message: 'Registration successful! Check your email for the code.',
       };
     } catch (error) {
-      console.error('Registration failed:', error);
+      this.logger.error('Registration failed', error);
       throw new InternalServerErrorException(
         'Failed to register user. Please try again later.',
       );
