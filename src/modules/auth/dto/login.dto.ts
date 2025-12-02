@@ -6,3 +6,7 @@ export class LoginDto {
   @IsNotEmpty()
   password: string;
 }
+
+export interface LoginResponse {
+  accessToken: string;
+}
