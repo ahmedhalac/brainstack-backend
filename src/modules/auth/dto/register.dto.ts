@@ -10,3 +10,7 @@ export class RegisterDto {
   @MinLength(6)
   password: string;
 }
+
+export interface RegisterResponse {
+  message: string;
+}

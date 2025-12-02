@@ -1,9 +1,10 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { RegisterDto } from './dto/register.dto';
+import { RegisterDto, RegisterResponse } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'src/prisma.service';
 import { LoginDto, LoginResponse } from './dto/login.dto';
@@ -18,7 +19,7 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto): Promise<RegisterResponse> {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -26,26 +27,34 @@ export class AuthService {
     if (existingUser) {
       throw new ConflictException('Email is already registered');
     }
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const code = Math.floor(100000 + Math.random() * 900000);
-    const expires = new Date(Date.now() + 10 * 60 * 1000); // expires in 10 minutes
 
-    const user = await this.prisma.user.create({
-      data: {
-        fullName: dto.fullName,
-        email: dto.email,
-        password: hashedPassword,
-        isEmailVerified: false,
-        verificationCode: code.toString(),
-        verificationCodeExpiresAt: expires,
-      },
-    });
+    try {
+      const hashedPassword = await bcrypt.hash(dto.password, 10);
+      const code = Math.floor(100000 + Math.random() * 900000);
+      const expires = new Date(Date.now() + 10 * 60 * 1000); // expires in 10 minutes
 
-    await this.mailService.sendVerificationCode(user.email, code);
+      const user = await this.prisma.user.create({
+        data: {
+          fullName: dto.fullName,
+          email: dto.email,
+          password: hashedPassword,
+          isEmailVerified: false,
+          verificationCode: code.toString(),
+          verificationCodeExpiresAt: expires,
+        },
+      });
 
-    return {
-      message: 'Registration successful! Check your email for the code.',
-    };
+      await this.mailService.sendVerificationCode(user.email, code);
+
+      return {
+        message: 'Registration successful! Check your email for the code.',
+      };
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw new InternalServerErrorException(
+        'Failed to register user. Please try again later.',
+      );
+    }
   }
 
   async login(dto: LoginDto): Promise<LoginResponse> {
