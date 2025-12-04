@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { MessageResponse, RegisterDto } from './dto/register.dto';
@@ -13,6 +15,7 @@ import { LoginDto, LoginResponse } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { MailService } from '../mail/mail.service';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendCodeDto } from './dto/resend-code.dto';
 
 @Injectable()
 export class AuthService {
@@ -74,25 +77,38 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (!user.isEmailVerified) {
+      throw new ForbiddenException('Please verify your email');
+    }
+
     const token = await this.jwtService.signAsync({ userId: user.id });
     return { accessToken: token };
   }
 
   async verifyEmail(dto: VerifyEmailDto): Promise<MessageResponse> {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-
-    if (!existingUser) {
-      throw new BadRequestException('User not found');
-    }
+    const normalizedEmail = dto.email.toLowerCase().trim();
 
     const user = await this.prisma.user.findFirst({
-      where: { email: dto.email, verificationCode: dto.verificationCode },
+      where: {
+        email: normalizedEmail,
+        verificationCode: dto.verificationCode,
+      },
     });
 
     if (!user) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (!existingUser) {
+        throw new NotFoundException('User not found');
+      }
+
       throw new BadRequestException('Verification code is invalid');
+    }
+
+    if (user.isEmailVerified) {
+      return { message: 'Email is already verified' };
     }
 
     if (
@@ -112,5 +128,36 @@ export class AuthService {
     });
 
     return { message: 'Email verified successfully' };
+  }
+
+  async resendCode(dto: ResendCodeDto): Promise<MessageResponse> {
+    const code = Math.floor(100000 + Math.random() * 900000);
+    const expires = new Date(Date.now() + 10 * 60 * 1000); // expires in 10 minutes
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isEmailVerified) {
+      throw new BadRequestException('User is already verified');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationCode: code.toString(),
+        verificationCodeExpiresAt: expires,
+      },
+    });
+
+    await this.mailService.sendVerificationCode(user.email, code);
+
+    return {
+      message: 'Code sent successfully. Please check your inbox',
+    };
   }
 }
