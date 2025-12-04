@@ -16,6 +16,6 @@ export class RegisterDto {
   password: string;
 }
 
-export interface RegisterResponse {
+export interface MessageResponse {
   message: string;
 }
