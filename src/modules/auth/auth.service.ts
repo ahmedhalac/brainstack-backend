@@ -32,7 +32,7 @@ export class AuthService {
       where: { email: dto.email },
     });
     if (existingUser) {
-      throw new ConflictException('Email is already registered');
+      throw new ConflictException('Email is already registered.');
     }
 
     try {
@@ -58,7 +58,7 @@ export class AuthService {
         message: 'Registration successful! Check your email for the code.',
       };
     } catch (error) {
-      this.logger.error('Unexpected error during registration', error);
+      this.logger.error('Unexpected error during registration.', error);
       throw new InternalServerErrorException(
         'Failed to register user. Please try again later.',
       );
@@ -74,11 +74,11 @@ export class AuthService {
       ? await bcrypt.compare(dto.password, user.password)
       : false;
     if (!user || !isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Invalid credentials.');
     }
 
     if (!user.isEmailVerified) {
-      throw new ForbiddenException('Please verify your email');
+      throw new ForbiddenException('Please verify your email first.');
     }
 
     const token = await this.jwtService.signAsync({ userId: user.id });
@@ -101,21 +101,21 @@ export class AuthService {
       });
 
       if (!existingUser) {
-        throw new NotFoundException('User not found');
+        throw new NotFoundException('User not found.');
       }
 
-      throw new BadRequestException('Verification code is invalid');
+      throw new BadRequestException('Verification code is invalid.');
     }
 
     if (user.isEmailVerified) {
-      return { message: 'Email is already verified' };
+      return { message: 'Email is already verified.' };
     }
 
     if (
       user.verificationCodeExpiresAt &&
       user.verificationCodeExpiresAt < new Date()
     ) {
-      throw new BadRequestException('Verification code has expired');
+      throw new BadRequestException('Verification code has expired.');
     }
 
     await this.prisma.user.update({
@@ -127,7 +127,7 @@ export class AuthService {
       },
     });
 
-    return { message: 'Email verified successfully' };
+    return { message: 'Email verified successfully.' };
   }
 
   async resendCode(dto: ResendCodeDto): Promise<MessageResponse> {
@@ -139,11 +139,11 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('User not found.');
     }
 
     if (user.isEmailVerified) {
-      throw new BadRequestException('User is already verified');
+      throw new BadRequestException('User is already verified.');
     }
 
     await this.prisma.user.update({
@@ -157,7 +157,7 @@ export class AuthService {
     await this.mailService.sendVerificationCode(user.email, code);
 
     return {
-      message: 'Code sent successfully. Please check your inbox',
+      message: 'Code sent successfully. Please check your inbox.',
     };
   }
 }
